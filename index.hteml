@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>试卷上传系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+</head>
+<body>
+    <div id="app">
+        <el-container style="max-width: 800px; margin: 20px auto;">
+            <el-main>
+                <el-card>
+                    <div slot="header">
+                        <span>上传试卷文件</span>
+                    </div>
+                    
+                    <el-upload
+                        drag
+                        :auto-upload="false"
+                        :on-change="handleFileChange"
+                        :show-file-list="false"
+                        action="#"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                    >
+                        <i class="el-icon-upload"></i>
+                        <div class="el-upload__text">将文件拖到此处，或<em>点击选择</em></div>
+                        <div class="el-upload__tip" slot="tip">支持格式：PDF/JPG/PNG，大小不超过50MB</div>
+                    </el-upload>
+
+                    <el-progress 
+                        v-if="uploadProgress > 0"
+                        :percentage="uploadProgress"
+                        :status="uploadStatus"
+                        style="margin-top: 20px;"
+                    ></el-progress>
+
+                    <div style="margin-top: 20px;">
+                        <el-button
+                            type="primary"
+                            :loading="isUploading"
+                            :disabled="!selectedFile"
+                            @click="startUpload"
+                        >
+                            {{ isUploading ? '上传中...' : '开始上传' }}
+                        </el-button>
+                    </div>
+
+                    <el-alert
+                        v-if="uploadResult"
+                        :title="uploadResult"
+                        :type="uploadSuccess ? 'success' : 'error'"
+                        show-icon
+                        style="margin-top: 20px;"
+                    ></el-alert>
+                </el-card>
+            </el-main>
+        </el-container>
+    </div>
+
+    <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+
+    <script>
+        const CLOUD_FUNCTION_URL = 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com/shangchuan';
+        const MAX_SIZE = 50 * 1024 * 1024;
+
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    selectedFile: null,
+                    isUploading: false,
+                    uploadProgress: 0,
+                    uploadResult: '',
+                    uploadSuccess: false
+                };
+            },
+            methods: {
+                handleFileChange(file) {
+                    if (file.size > MAX_SIZE) {
+                        this.$message.error('文件大小超过限制');
+                        this.selectedFile = null;
+                        return;
+                    }
+                    this.selectedFile = file.raw;
+                    this.resetStatus();
+                },
+
+                async getCredentials() {
+                    try {
+                        const res = await fetch(CLOUD_FUNCTION_URL, {
+                            method: 'POST'
+                        });
+                        
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            throw new Error(err.message || '凭证获取失败');
+                        }
+                        
+                        return await res.json();
+                    } catch (e) {
+                        throw new Error(`凭证请求失败: ${e.message}`);
+                    }
+                },
+
+                async startUpload() {
+                    if (!this.selectedFile) return;
+
+                    this.isUploading = true;
+                    this.resetStatus();
+
+                    try {
+                        // 获取凭证数据
+                        const { data } = await this.getCredentials();
+                        
+                        // 构造表单数据
+                        const formData = new FormData();
+                        formData.append('key', data.key);
+                        formData.append('policy', data.policy);
+                        formData.append('q-sign-algorithm', data['q-sign-algorithm']);
+                        formData.append('q-ak', data['q-ak']);
+                        formData.append('q-key-time', data['q-key-time']);
+                        formData.append('q-signature', data['q-signature']);
+                        formData.append('file', this.selectedFile);
+
+                        // 执行上传
+                        await this.uploadToCOS(`${data.url}/${data.key}`, formData);
+                        
+                        this.uploadSuccess = true;
+                        this.uploadResult = `上传成功！文件地址：${data.url}/${data.key}`;
+                    } catch (e) {
+                        this.uploadSuccess = false;
+                        this.uploadResult = `上传失败: ${e.message}`;
+                        console.error(e);
+                    } finally {
+                        this.isUploading = false;
+                    }
+                },
+
+                uploadToCOS(url, formData) {
+                    return new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', url, true);
+
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                this.uploadProgress = Math.round((e.loaded / e.total) * 100);
+                            }
+                        };
+
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                resolve();
+                            } else {
+                                reject(new Error(`上传失败 (${xhr.status})`));
+                            }
+                        };
+
+                        xhr.onerror = () => reject(new Error('网络连接异常'));
+                        xhr.send(formData);
+                    });
+                },
+
+                resetStatus() {
+                    this.uploadProgress = 0;
+                    this.uploadResult = '';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
