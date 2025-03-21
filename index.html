@@ -9,44 +9,53 @@
     <button onclick="upload()">上传</button>
 
     <script>
-        const bucket = 'shijuanshibie-1343742632';
-        const region = 'ap-beijing'; // 北京地域的region代码是ap-beijing
+        // 配置参数（需自行修改部分）
+        const bucket = 'shijuanshibie-1343742632'; // 格式必须是 BucketName-APPID
+        const region = 'ap-beijing';          // 北京地域
+        const cloudFunctionUrl = 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com/shangchuan'; // 替换为你的云函数URL
 
+        // 获取临时密钥
         async function getTempKey() {
-            const res = await fetch(
-                'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com/shangchuan', // 例如：https://your-env-id.service.tcloudbase.com/getTempKey
-                { method: 'POST' }
-            );
+            const res = await fetch(cloudFunctionUrl, { method: 'POST' });
             return res.json();
         }
 
+        // 上传逻辑
         async function upload() {
             const file = document.getElementById('fileInput').files[0];
             if (!file) return alert('请选择文件');
 
-            const tempKey = await getTempKey();
-            
-            const cos = new COS({
-                getAuthorization: (options, callback) => {
-                    callback({
-                        TmpSecretId: tempKey.tmpSecretId,
-                        TmpSecretKey: tempKey.tmpSecretKey,
-                        XCosSecurityToken: tempKey.sessionToken,
-                        StartTime: tempKey.startTime,
-                        ExpiredTime: tempKey.expiredTime,
-                    });
-                }
-            });
+            try {
+                const tempKey = await getTempKey();
+                
+                const cos = new COS({
+                    getAuthorization: (options, callback) => {
+                        callback({
+                            TmpSecretId: tempKey.tmpSecretId,
+                            TmpSecretKey: tempKey.tmpSecretKey,
+                            XCosSecurityToken: tempKey.sessionToken, // 关键参数
+                            StartTime: tempKey.startTime,
+                            ExpiredTime: tempKey.expiredTime
+                        });
+                    }
+                });
 
-            cos.putObject({
-                Bucket: bucket,
-                Region: region,
-                Key: 'images/' + file.name,
-                Body: file,
-            }, (err, data) => {
-                if (err) console.error(err);
-                else alert('上传成功！URL: ' + data.Location);
-            });
+                cos.putObject({
+                    Bucket: bucket,
+                    Region: region,
+                    Key: 'images/' + file.name,
+                    Body: file,
+                }, (err, data) => {
+                    if (err) {
+                        console.error('上传失败:', err);
+                        alert('上传失败，请检查控制台日志');
+                    } else {
+                        alert('上传成功！URL: ' + data.Location);
+                    }
+                });
+            } catch (err) {
+                alert('获取密钥失败: ' + err.message);
+            }
         }
     </script>
 </body>
