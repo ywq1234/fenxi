@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文件上传演示（优化版）</title>
+    <title>文件上传演示（安全优化版）</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -41,10 +41,11 @@
             background: #ccc;
             cursor: not-allowed;
         }
+        .status-message { margin-top: 10px; }
     </style>
 </head>
 <body>
-    <h1>文件上传演示（优化版）</h1>
+    <h1>文件上传演示（安全优化版）</h1>
     
     <div class="upload-container">
         <input type="file" id="file-input" accept="image/*, application/pdf">
@@ -52,7 +53,7 @@
         <div id="progress-bar">
             <div id="progress"></div>
         </div>
-        <p id="status"></p>
+        <p id="status" class="status-message"></p>
         <div id="debug-info" style="color:#666;font-size:0.9em"></div>
     </div>
 
@@ -64,36 +65,34 @@
             const file = fileInput.files[0];
             
             if (!file) {
-                alert('请先选择文件');
+                showStatus('请先选择文件', 'red');
                 return;
             }
 
             try {
                 // 禁用上传按钮
-                document.getElementById('upload-btn').disabled = true;
-                showStatus('正在获取上传凭证...', 'blue');
+                const uploadBtn = document.getElementById('upload-btn');
+                uploadBtn.disabled = true;
+                showStatus('正在获取上传凭证...', '#2196F3');
                 document.getElementById('debug-info').textContent = '';
 
                 // 1. 获取上传凭证
-                const response = await fetch(CLOUD_FUNCTION_URL, {
-                    method: 'POST'
-                });
+                const response = await fetch(CLOUD_FUNCTION_URL, { method: 'POST' });
                 
                 if (!response.ok) {
-                    throw new Error(`云函数请求失败: ${response.status}`);
+                    throw new Error(`凭证请求失败: ${response.status}`);
                 }
 
                 const { data } = await response.json();
-                showDebugInfo('云函数返回数据:', JSON.stringify(data, null, 2));
+                showDebugInfo('云函数响应:', data);
 
                 // 2. 验证URL格式
                 if (!validateCosUrl(data.url)) {
-                    throw new Error('云函数返回的URL格式错误');
+                    throw new Error('无效的COS地址格式');
                 }
 
-                // 3. 构造上传URL
-                const uploadUrl = `${data.url}/${data.key}`; // 去掉encodeURIComponent
-                showStatus('开始上传文件...', 'blue');
+                // 3. 构造上传URL（关键修改点）
+                const uploadUrl = `${data.url}/${data.key}`;  // 移除encodeURIComponent
 
                 // 4. 构造表单数据
                 const formData = new FormData();
@@ -120,28 +119,28 @@
                     if (xhr.readyState === 4) {
                         let statusText = '';
                         if (xhr.status === 200 || xhr.status === 204) {
-                            statusText = '上传成功！';
-                            document.getElementById('file-input').value = '';
+                            statusText = '✓ 上传成功';
+                            fileInput.value = '';  // 清空文件选择
                         } else {
-                            statusText = `上传失败: ${xhr.status} ${xhr.statusText}`;
+                            statusText = `✗ 上传失败: ${xhr.status}`;
                             try {
                                 const cosResponse = JSON.parse(xhr.responseText);
-                                statusText += ` | COS错误: ${cosResponse.message || cosResponse.code}`;
+                                statusText += ` | ${cosResponse.message || cosResponse.code}`;
                             } catch {}
                         }
-                        showStatus(statusText, xhr.status === 200 ? 'green' : 'red');
+                        showStatus(statusText, xhr.status === 200 ? '#4CAF50' : '#f44336');
                     }
                 };
 
-                xhr.onerror = () => showStatus('网络错误，请检查控制台', 'red');
+                xhr.onerror = () => showStatus('网络连接异常', '#f44336');
                 xhr.timeout = 30000;
-                xhr.ontimeout = () => showStatus('请求超时，请重试', 'red');
+                xhr.ontimeout = () => showStatus('请求超时，请重试', '#f44336');
 
                 xhr.send(formData);
 
             } catch (error) {
-                console.error(error);
-                showStatus(`操作失败: ${error.message}`, 'red');
+                console.error('上传流程异常:', error);
+                showStatus(`操作失败: ${error.message}`, '#f44336');
             } finally {
                 document.getElementById('upload-btn').disabled = false;
                 setTimeout(() => {
@@ -151,21 +150,30 @@
             }
         }
 
-        // URL验证函数
+        // 修改后的URL验证函数
         function validateCosUrl(url) {
             const pattern = /^https:\/\/shijuanshibie-\d+-[\w-]+\.cos\.ap-beijing\.myqcloud\.com\/?$/;
             return pattern.test(url);
         }
- 
+
+        // 安全增强的调试信息显示
+        function showDebugInfo(title, data) {
+            const debugEl = document.getElementById('debug-info');
+            // 过滤敏感字段
+            const sanitizedData = { ...data };
+            delete sanitizedData['q-ak'];
+            delete sanitizedData['q-signature'];
+            debugEl.innerHTML = `
+                <strong>${title}</strong>
+                <pre>${JSON.stringify(sanitizedData, null, 2)}</pre>
+            `;
+        }
+
+        // 状态显示函数
         function showStatus(text, color) {
             const statusEl = document.getElementById('status');
             statusEl.textContent = text;
             statusEl.style.color = color;
-        }
-
-        function showDebugInfo(title, content) {
-            const debugEl = document.getElementById('debug-info');
-            debugEl.innerHTML = `<strong>${title}</strong><pre>${content}</pre>`;
         }
     </script>
 </body>
