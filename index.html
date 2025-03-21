@@ -92,7 +92,7 @@
                 }
 
                 // 3. 构造上传URL
-                const uploadUrl = `${data.url}/${encodeURIComponent(data.key)}`;
+                const uploadUrl = `${data.url}/${data.key}`; // 去掉encodeURIComponent
                 showStatus('开始上传文件...', 'blue');
 
                 // 4. 构造表单数据
