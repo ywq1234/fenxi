@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文件上传演示</title>
+    <title>文件上传演示（优化版）</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -44,7 +44,7 @@
     </style>
 </head>
 <body>
-    <h1>文件上传演示</h1>
+    <h1>文件上传演示（优化版）</h1>
     
     <div class="upload-container">
         <input type="file" id="file-input" accept="image/*, application/pdf">
@@ -53,6 +53,7 @@
             <div id="progress"></div>
         </div>
         <p id="status"></p>
+        <div id="debug-info" style="color:#666;font-size:0.9em"></div>
     </div>
 
     <script>
@@ -71,6 +72,7 @@
                 // 禁用上传按钮
                 document.getElementById('upload-btn').disabled = true;
                 showStatus('正在获取上传凭证...', 'blue');
+                document.getElementById('debug-info').textContent = '';
 
                 // 1. 获取上传凭证
                 const response = await fetch(CLOUD_FUNCTION_URL, {
@@ -78,27 +80,33 @@
                 });
                 
                 if (!response.ok) {
-                    throw new Error('获取凭证失败');
+                    throw new Error(`云函数请求失败: ${response.status}`);
                 }
 
                 const { data } = await response.json();
+                showDebugInfo('云函数返回数据:', JSON.stringify(data, null, 2));
+
+                // 2. 验证URL格式
+                if (!validateCosUrl(data.url)) {
+                    throw new Error('云函数返回的URL格式错误');
+                }
+
+                // 3. 构造上传URL
+                const uploadUrl = `${data.url}/${encodeURIComponent(data.key)}`;
                 showStatus('开始上传文件...', 'blue');
 
-                // 2. 构造表单数据
+                // 4. 构造表单数据
                 const formData = new FormData();
-                formData.append('key', data.key);
-                formData.append('policy', data.policy);
-                formData.append('q-sign-algorithm', data['q-sign-algorithm']);
-                formData.append('q-ak', data['q-ak']);
-                formData.append('q-key-time', data['q-key-time']);
-                formData.append('q-signature', data['q-signature']);
+                Object.entries(data).forEach(([k, v]) => {
+                    if (k !== 'url') formData.append(k, v);
+                });
                 formData.append('file', file);
 
-                // 3. 上传文件到COS
+                // 5. 上传到COS
                 const xhr = new XMLHttpRequest();
-                xhr.open('POST', data.url, true);
+                xhr.open('POST', uploadUrl, true);
 
-                // 显示进度条
+                // 进度处理
                 document.getElementById('progress-bar').style.display = 'block';
                 xhr.upload.onprogress = function(e) {
                     if (e.lengthComputable) {
@@ -107,24 +115,33 @@
                     }
                 };
 
-                xhr.onload = function() {
-                    if (xhr.status === 204 || xhr.status === 200) {
-                        showStatus('上传成功！', 'green');
-                        document.getElementById('file-input').value = '';
-                    } else {
-                        throw new Error('上传失败');
+                // 响应处理
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        let statusText = '';
+                        if (xhr.status === 200 || xhr.status === 204) {
+                            statusText = '上传成功！';
+                            document.getElementById('file-input').value = '';
+                        } else {
+                            statusText = `上传失败: ${xhr.status} ${xhr.statusText}`;
+                            try {
+                                const cosResponse = JSON.parse(xhr.responseText);
+                                statusText += ` | COS错误: ${cosResponse.message || cosResponse.code}`;
+                            } catch {}
+                        }
+                        showStatus(statusText, xhr.status === 200 ? 'green' : 'red');
                     }
                 };
 
-                xhr.onerror = function() {
-                    throw new Error('网络错误');
-                };
+                xhr.onerror = () => showStatus('网络错误，请检查控制台', 'red');
+                xhr.timeout = 30000;
+                xhr.ontimeout = () => showStatus('请求超时，请重试', 'red');
 
                 xhr.send(formData);
 
             } catch (error) {
                 console.error(error);
-                showStatus(`上传失败: ${error.message}`, 'red');
+                showStatus(`操作失败: ${error.message}`, 'red');
             } finally {
                 document.getElementById('upload-btn').disabled = false;
                 setTimeout(() => {
@@ -134,10 +151,21 @@
             }
         }
 
+        // URL验证函数
+        function validateCosUrl(url) {
+            const pattern = /^https:\/\/shijuanshibie-\d+-\w+\.cos\.ap-beijing\.myqcloud\.com\/?$/;
+            return pattern.test(url);
+        }
+
         function showStatus(text, color) {
             const statusEl = document.getElementById('status');
             statusEl.textContent = text;
             statusEl.style.color = color;
+        }
+
+        function showDebugInfo(title, content) {
+            const debugEl = document.getElementById('debug-info');
+            debugEl.innerHTML = `<strong>${title}</strong><pre>${content}</pre>`;
         }
     </script>
 </body>
