@@ -153,10 +153,10 @@
 
         // URL验证函数
         function validateCosUrl(url) {
-            const pattern = /^https:\/\/shijuanshibie-\d+-\w+\.cos\.ap-beijing\.myqcloud\.com\/?$/;
+            const pattern = /^https:\/\/shijuanshibie-\d+-[\w-]+\.cos\.ap-beijing\.myqcloud\.com\/?$/;
             return pattern.test(url);
         }
-
+ 
         function showStatus(text, color) {
             const statusEl = document.getElementById('status');
             statusEl.textContent = text;
