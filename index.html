@@ -111,8 +111,8 @@
                     this.resetStatus();
 
                     try {
-                        // 获取凭证数据
-                        const { data } = await this.getCredentials();
+                        // 获取凭证数据（唯一修改点）
+                        const data = await this.getCredentials(); // 去除了 { data } 的解构
                         
                         // 构造表单数据
                         const formData = new FormData();
