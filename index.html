@@ -1,70 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>前端直传文件到腾讯云 COS</title>
-  <!-- 引入 COS SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js"></script>
+  <title>试卷识别文件上传</title>
+  <!-- 使用可靠的 COS SDK CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/cos-js-sdk-v5@1.4.2/dist/cos-js-sdk-v5.min.js"></script>
 </head>
 <body>
   <input type="file" id="file-input" />
-  <button onclick="uploadFile()">上传</button>
-  <div id="progress"></div>
+  <button onclick="uploadFile()">上传文件</button>
+  <div id="progress" style="margin-top: 10px;"></div>
 
   <script>
-    // 配置参数（替换为你自己的信息）
+    // ============== 配置区域（根据你的信息修改）==============
     const cosConfig = {
-      Bucket: 'shijuanshibie-1343742632',      // 存储桶名称
-      Region: 'ap-beijing',              // 存储桶地域
-      UploadPath: 'uploads/',              // 文件存储路径
-      ServerURL: 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com/shangchuan' // 云函数地址（用于获取临时密钥）
+      Bucket: 'shijuanshibie-1343742632',       // 存储桶名称
+      Region: 'ap-beijing',                     // 存储桶地域（北京）
+      UploadPath: 'uploads/',                   // 文件存储路径
+      ServerURL: 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com/shangchuan' // 云函数地址
     };
 
-    // 初始化 COS 实例
+    // ============== COS 初始化 ==============
     const cos = new COS({
       getAuthorization: async (options, callback) => {
         try {
           // 调用云函数获取临时密钥
           const res = await fetch(cosConfig.ServerURL);
           const data = await res.json();
+          
+          if (!data.credentials) {
+            throw new Error('云函数返回格式错误，缺少 credentials 字段');
+          }
+
           callback({
             TmpSecretId: data.credentials.tmpSecretId,
             TmpSecretKey: data.credentials.tmpSecretKey,
             SecurityToken: data.credentials.sessionToken,
-            StartTime: data.startTime,
-            ExpiredTime: data.expiredTime,
           });
         } catch (err) {
-          console.error('获取临时密钥失败:', err);
+          console.error('[密钥获取失败]', err);
+          alert('无法获取上传凭证，请刷新页面重试');
         }
       }
     });
 
-    // 上传文件
+    // ============== 上传函数 ==============
     async function uploadFile() {
-      const file = document.getElementById('file-input').files[0];
-      if (!file) return alert('请选择文件');
+      const fileInput = document.getElementById('file-input');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        alert('请先选择要上传的文件');
+        return;
+      }
 
-      // 生成唯一文件名（避免覆盖）
-      const fileName = `${cosConfig.UploadPath}${Date.now()}_${file.name}`;
+      // 生成唯一文件名（防止覆盖）
+      const fileName = `${cosConfig.UploadPath}${Date.now()}_${file.name.replace(/\s+/g, '_')}`; // 替换空格为下划线
 
-      // 分片上传（自动处理大文件）
+      // 显示上传进度
+      const progressDiv = document.getElementById('progress');
+      progressDiv.innerHTML = '准备上传...';
+
+      // 执行分片上传
       cos.uploadFile({
         Bucket: cosConfig.Bucket,
         Region: cosConfig.Region,
         Key: fileName,
         Body: file,
-        SliceSize: 5 * 1024 * 1024, // 分片大小 5MB（腾讯云支持最小 1MB）
+        SliceSize: 5 * 1024 * 1024, // 分片大小 5MB
         onProgress: (progressData) => {
-          document.getElementById('progress').innerHTML = 
-            `上传进度: ${Math.round(progressData.percent * 100)}%`;
+          progressDiv.innerHTML = `上传进度: ${Math.round(progressData.percent * 100)}%`;
         },
       }, (err, data) => {
         if (err) {
-          console.error('上传失败:', err);
-          alert('上传失败，请检查控制台');
+          console.error('[上传失败]', err);
+          progressDiv.innerHTML = `上传失败: ${err.message || '未知错误'}`;
         } else {
-          console.log('上传成功:', data.Location);
-          alert(`文件地址: ${data.Location}`);
+          console.log('[上传成功]', data.Location);
+          progressDiv.innerHTML = `文件已上传！访问地址: ${data.Location}`;
         }
       });
     }
