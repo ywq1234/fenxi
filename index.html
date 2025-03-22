@@ -1,85 +1,172 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-  <title>试卷识别文件上传</title>
-  <!-- 使用可靠的 COS SDK CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>试卷识别文件上传</title>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .upload-box {
+            border: 2px dashed #ccc;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #preview {
+            margin-top: 20px;
+            max-width: 100%;
+        }
+        .progress {
+            height: 20px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
 <body>
-  <input type="file" id="file-input" />
-  <button onclick="uploadFile()">上传文件</button>
-  <div id="progress" style="margin-top: 10px;"></div>
+    <div class="container">
+        <h2>试卷文件上传</h2>
+        <div class="upload-box">
+            <input type="file" id="fileInput" accept="image/*, .pdf">
+            <button onclick="uploadFile()" id="uploadBtn">开始上传</button>
+            <div class="progress">
+                <div class="progress-bar" style="width: 0%"></div>
+            </div>
+            <p id="status"></p>
+            <img id="preview">
+        </div>
+    </div>
 
-  <script>
-    // ============== 配置区域（根据你的信息修改）==============
-    const cosConfig = {
-      Bucket: 'shijuanshibie-1343742632',       // 存储桶名称
-      Region: 'ap-beijing',                     // 存储桶地域（北京）
-      UploadPath: 'uploads/',                   // 文件存储路径
-      ServerURL: 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com/shangchuan' // 云函数地址
-    };
+    <script src="https://cdn.jsdelivr.net/npm/cos-js-sdk-v5/dist/cos.min.js"></script>
+    <script>
+        const config = {
+            Bucket: 'shijuanshibie-1343742632',
+            Region: 'ap-beijing',
+            UploadPath: 'uploads/',
+            ServerURL: 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com/shangchuan'
+        };
 
-    // ============== COS 初始化 ==============
-    const cos = new COS({
-      getAuthorization: async (options, callback) => {
-        try {
-          // 调用云函数获取临时密钥
-          const res = await fetch(cosConfig.ServerURL);
-          const data = await res.json();
-          
-          if (!data.credentials) {
-            throw new Error('云函数返回格式错误，缺少 credentials 字段');
-          }
+        let cos = null;
+        let selectedFile = null;
 
-          callback({
-            TmpSecretId: data.credentials.tmpSecretId,
-            TmpSecretKey: data.credentials.tmpSecretKey,
-            SecurityToken: data.credentials.sessionToken,
-          });
-        } catch (err) {
-          console.error('[密钥获取失败]', err);
-          alert('无法获取上传凭证，请刷新页面重试');
+        // 文件选择监听
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            previewFile(selectedFile);
+        });
+
+        // 上传文件
+        async function uploadFile() {
+            if (!selectedFile) {
+                alert('请先选择文件');
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('uploadBtn');
+                btn.disabled = true;
+                updateStatus('正在获取上传凭证...');
+
+                // 1. 获取临时密钥
+                const tempCred = await getTempCredentials();
+                
+                // 2. 初始化COS实例
+                cos = new COS({
+                    getAuthorization: (options, callback) => callback({
+                        TmpSecretId: tempCred.credentials.tmpSecretId,
+                        TmpSecretKey: tempCred.credentials.tmpSecretKey,
+                        SecurityToken: tempCred.credentials.sessionToken,
+                        StartTime: tempCred.startTime,
+                        ExpiredTime: tempCred.expiredTime
+                    })
+                });
+
+                // 3. 生成唯一文件名
+                const fileExt = selectedFile.name.split('.').pop();
+                const fileName = `${Date.now()}-${Math.random().toString(36).substr(2)}.${fileExt}`;
+                const key = config.UploadPath + fileName;
+
+                // 4. 执行上传
+                updateStatus('正在上传文件...');
+                const result = await uploadToCOS(cos, key);
+
+                updateStatus('上传成功！');
+                console.log('文件地址：', result.Location);
+                alert('文件上传成功！');
+
+            } catch (error) {
+                console.error('上传失败：', error);
+                updateStatus('上传失败：' + error.message);
+                alert('上传失败：' + error.message);
+            } finally {
+                document.getElementById('uploadBtn').disabled = false;
+            }
         }
-      }
-    });
 
-    // ============== 上传函数 ==============
-    async function uploadFile() {
-      const fileInput = document.getElementById('file-input');
-      const file = fileInput.files[0];
-      
-      if (!file) {
-        alert('请先选择要上传的文件');
-        return;
-      }
-
-      // 生成唯一文件名（防止覆盖）
-      const fileName = `${cosConfig.UploadPath}${Date.now()}_${file.name.replace(/\s+/g, '_')}`; // 替换空格为下划线
-
-      // 显示上传进度
-      const progressDiv = document.getElementById('progress');
-      progressDiv.innerHTML = '准备上传...';
-
-      // 执行分片上传
-      cos.uploadFile({
-        Bucket: cosConfig.Bucket,
-        Region: cosConfig.Region,
-        Key: fileName,
-        Body: file,
-        SliceSize: 5 * 1024 * 1024, // 分片大小 5MB
-        onProgress: (progressData) => {
-          progressDiv.innerHTML = `上传进度: ${Math.round(progressData.percent * 100)}%`;
-        },
-      }, (err, data) => {
-        if (err) {
-          console.error('[上传失败]', err);
-          progressDiv.innerHTML = `上传失败: ${err.message || '未知错误'}`;
-        } else {
-          console.log('[上传成功]', data.Location);
-          progressDiv.innerHTML = `文件已上传！访问地址: ${data.Location}`;
+        // 获取临时凭证
+        async function getTempCredentials() {
+            const response = await fetch(config.ServerURL);
+            if (!response.ok) throw new Error('获取凭证失败');
+            return response.json();
         }
-      });
-    }
-  </script>
+
+        // 执行COS上传
+        function uploadToCOS(cosInstance, key) {
+            return new Promise((resolve, reject) => {
+                cosInstance.putObject({
+                    Bucket: config.Bucket,
+                    Region: config.Region,
+                    Key: key,
+                    Body: selectedFile,
+                    onProgress: function(progressData) {
+                        const percent = Math.round(progressData.percent * 100);
+                        document.querySelector('.progress-bar').style.width = percent + '%';
+                    }
+                }, (err, data) => {
+                    if (err) reject(err);
+                    else resolve(data);
+                });
+            });
+        }
+
+        // 更新状态显示
+        function updateStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+
+        // 图片预览
+        function previewFile(file) {
+            if (!file.type.startsWith('image/')) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('preview').src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+    </script>
 </body>
 </html>
