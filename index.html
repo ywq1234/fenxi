@@ -35,7 +35,7 @@
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
             action: 'init',
-            fileId,
+            fileId: fileId,  // 这里改为使用前端生成的fileId
             fileName: file.name
           })
         });
@@ -48,7 +48,7 @@
           const formData = new FormData();
           formData.append('chunk', chunk);
           formData.append('chunkIndex', i);
-          formData.append('fileId', uploadId);
+          formData.append('fileId', uploadId);  // 使用服务端返回的uploadId
           formData.append('fileName', file.name);
 
           const uploadRes = await fetch(API_URL, { 
