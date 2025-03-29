@@ -1,121 +1,314 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>试卷分析系统</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能试卷分析系统</title>
   <style>
-    h1, h2 { font-weight: normal; }
-    #msg { margin-top: 10px; color: #666; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    #result { white-space: pre-wrap; padding: 15px; border: 1px solid #eee; }
-    .history-item { margin: 10px 0; padding: 8px; border: 1px solid #ddd; }
+    /* 苹果设计系统规范 */
+    :root {
+      --primary-blue: #0071e3;
+      --hover-blue: #0063c7;
+      --system-gray: #8e8e93;
+      --background: #f5f5f7;
+      --card-background: #ffffff;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell;
+      background: var(--background);
+      color: #1d1d1f;
+      line-height: 1.5;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      text-align: center;
+      margin: 3rem 0;
+      letter-spacing: -0.03em;
+      color: #1d1d1f;
+      position: relative;
+    }
+
+    h1::after {
+      content: "";
+      display: block;
+      width: 50px;
+      height: 3px;
+      background: var(--primary-blue);
+      margin: 1.5rem auto 0;
+      border-radius: 2px;
+    }
+
+    /* 文件上传区域 */
+    #fileSelector {
+      width: 100%;
+      padding: 1.2rem;
+      border: 2px dashed #d2d2d7;
+      border-radius: 18px;
+      background: var(--card-background);
+      margin: 1.5rem 0;
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      font-size: 1rem;
+    }
+
+    #fileSelector:hover {
+      border-color: var(--primary-blue);
+      background: rgba(0, 113, 227, 0.02);
+    }
+
+    /* 按钮组 */
+    button {
+      width: 100%;
+      padding: 1.2rem;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(145deg, var(--primary-blue), var(--hover-blue));
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      box-shadow: 0 4px 16px rgba(0, 113, 227, 0.15);
+    }
+
+    button:disabled {
+      background: linear-gradient(145deg, #e5e5ea, #d1d1d6);
+      color: #86868b;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    button:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0, 113, 227, 0.25);
+      filter: brightness(1.05);
+    }
+
+    button:active {
+      transform: translateY(1px);
+      filter: brightness(0.98);
+    }
+
+    /* 消息状态 */
+    #msg {
+      padding: 1rem;
+      margin: 1.5rem 0;
+      border-radius: 12px;
+      background: rgba(0, 113, 227, 0.08);
+      border: 1px solid rgba(0, 113, 227, 0.12);
+      color: var(--system-gray);
+      font-size: 0.95rem;
+    }
+
+    /* 结果展示 */
+    #result {
+      background: var(--card-background);
+      border-radius: 18px;
+      padding: 2rem;
+      margin: 2rem 0;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+      line-height: 1.8;
+      white-space: pre-wrap;
+      border: 1px solid #eee;
+    }
+
+    #result a {
+      color: var(--primary-blue);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.2rem 0;
+      position: relative;
+    }
+
+    #result a::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: currentColor;
+      transition: width 0.3s ease;
+    }
+
+    #result a:hover::after {
+      width: 100%;
+    }
+
+    /* 历史记录 */
+    .history-item {
+      background: var(--card-background);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.03);
+      transition: transform 0.3s ease;
+    }
+
+    .history-item:hover {
+      transform: translateX(8px);
+    }
+
+    .history-item div {
+      color: var(--system-gray);
+      font-size: 0.9rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .history-item a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      background: rgba(0, 113, 227, 0.1);
+      color: var(--primary-blue);
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .history-item a:hover {
+      background: rgba(0, 113, 227, 0.15);
+    }
+
+    /* 加载动画 */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 113, 227, 0.2);
+      border-top-color: var(--primary-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* 移动端优化 */
+    @media (max-width: 768px) {
+      body {
+        padding: 1.5rem;
+        font-size: 1rem;
+      }
+
+      h1 {
+        font-size: 1.8rem;
+        margin: 2rem 0;
+      }
+
+      #fileSelector {
+        padding: 1rem;
+        border-radius: 14px;
+      }
+
+      button {
+        padding: 1.1rem;
+        font-size: 1rem;
+        border-radius: 12px;
+      }
+
+      #result {
+        padding: 1.5rem;
+        border-radius: 16px;
+      }
+
+      .history-item {
+        padding: 1.2rem;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>试卷分析系统</h1>
+  <h1>智能试卷分析系统</h1>
   
-  <!-- 多文件上传 -->
-  <input id="fileSelector" type="file" multiple />
-  <button id="submitBtn">上传图片</button>
-  <button id="analyzeBtn" disabled>开始分析</button>
-  <button id="historyBtn">查看记录</button>
+  <input type="file" id="fileSelector" multiple accept="image/*">
+  <button id="submitBtn">📤 上传图片</button>
+  <button id="analyzeBtn" disabled>🔍 开始分析</button>
+  <button id="historyBtn">⏳ 查看记录</button>
+  
   <div id="msg"></div>
   <div id="result"></div>
   <div id="history"></div>
 
   <script>
-    (function () {
+    (function() {
       const API_ENDPOINT = 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com';
       let uploadedUrls = [];
       const userId = localStorage.getItem('user_id') || Date.now().toString(36) + Math.random().toString(36).substr(2);
       localStorage.setItem('user_id', userId);
 
-      // --- 原始COS直传逻辑（修改后）---
-      const camSafeUrlEncode = function (str) {
-        return encodeURIComponent(str)
-          .replace(/!/g, '%21')
-          .replace(/'/g, '%27')
-          .replace(/\(/g, '%28')
-          .replace(/\)/g, '%29')
-          .replace(/\*/g, '%2A');
+      // COS直传逻辑
+      const camSafeUrlEncode = str => encodeURIComponent(str)
+        .replace(/!/g, '%21').replace(/'/g, '%27')
+        .replace(/\(/g, '%28').replace(/\)/g, '%29')
+        .replace(/\*/g, '%2A');
+
+      const getAuthorization = (opt, callback) => {
+        fetch(`${API_ENDPOINT}/shangchuan?ext=${opt.ext}`)
+          .then(res => res.json())
+          .then(data => callback(null, data.data))
+          .catch(err => callback('获取凭证失败'));
       };
 
-      const getAuthorization = function (opt, callback) {
-        const url = `${API_ENDPOINT}/shangchuan?ext=${opt.ext}`;
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.onload = function (e) {
-          try {
-            const result = JSON.parse(e.target.responseText);
-            const credentials = result.data;
-            callback(null, {
-              securityToken: credentials.sessionToken,
-              authorization: credentials.authorization,
-              cosKey: credentials.cosKey,
-              cosHost: credentials.cosHost,
-            });
-          } catch (e) {
-            callback('获取签名失败');
-          }
-        };
-        xhr.onerror = () => callback('网络错误');
-        xhr.send();
-      };
-
-      const uploadFile = function (file, callback) {
-        const fileName = file.name;
-        let ext = '';
-        const lastDotIndex = fileName.lastIndexOf('.');
-        if (lastDotIndex > -1) ext = fileName.substring(lastDotIndex + 1);
-        
-        getAuthorization({ ext }, function (err, info) {
+      const uploadFile = (file, callback) => {
+        const ext = file.name.split('.').pop() || '';
+        getAuthorization({ ext }, (err, credentials) => {
           if (err) return callback(err);
-          const url = `${info.cosHost}/${camSafeUrlEncode(info.cosKey).replace(/%2F/g, '/')}`;
+          
+          const url = `${credentials.cosHost}/${camSafeUrlEncode(credentials.cosKey)}`;
           const xhr = new XMLHttpRequest();
-          xhr.open('PUT', `https://${url}`, true);
-          xhr.setRequestHeader('Authorization', info.authorization);
+          xhr.open('PUT', `https://${url}`);
+          xhr.setRequestHeader('Authorization', credentials.authorization);
           xhr.setRequestHeader('X-User-Id', userId);
-          xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              callback(null, { url: `https://${url}` });
-            } else {
-              callback(`上传失败（${xhr.status}）`);
-            }
-          };
+          
+          xhr.onload = () => xhr.status >= 200 && xhr.status < 300 
+            ? callback(null, { url: `https://${url}` }) 
+            : callback(`上传失败 (${xhr.status})`);
+          
+          xhr.onerror = () => callback('网络错误');
           xhr.send(file);
         });
       };
 
-      // --- 上传按钮逻辑 ---
-      document.getElementById('submitBtn').onclick = async function () {
+      // 上传控制
+      document.getElementById('submitBtn').onclick = async function() {
         const files = [...document.getElementById('fileSelector').files];
-        if (files.length === 0) {
-          document.getElementById('msg').innerText = '未选择文件';
-          return;
-        }
+        if (!files.length) return showMessage('请选择图片文件', 'warning');
 
+        showMessage('📡 上传中...');
         uploadedUrls = [];
-        document.getElementById('msg').innerText = '上传中...';
         
-        const uploadPromises = files.map(file => 
-          new Promise(resolve => {
-            uploadFile(file, (err, data) => {
-              if (!err && data) uploadedUrls.push(data.url);
-              resolve();
-            });
-          })
-        );
-
-        await Promise.all(uploadPromises);
+        await Promise.all(files.map(file => 
+          new Promise(resolve => uploadFile(file, (err, data) => {
+            if (!err && data) uploadedUrls.push(data.url);
+            resolve();
+          }))
+        ));
+        
         document.getElementById('analyzeBtn').disabled = false;
-        document.getElementById('msg').innerText = `已上传 ${uploadedUrls.length} 张图片`;
+        showMessage(`✅ 成功上传 ${uploadedUrls.length} 张图片`);
       };
 
-      // --- 分析按钮逻辑 ---
-      document.getElementById('analyzeBtn').onclick = async function () {
-        document.getElementById('msg').innerText = '分析中...';
+      // 分析功能
+      document.getElementById('analyzeBtn').onclick = async function() {
+        const btn = this;
+        btn.innerHTML = '<div class="loading"></div> 分析中...';
+        btn.disabled = true;
+        
         try {
-          const response = await fetch(`${API_ENDPOINT}/fenxi`, {
+          const res = await fetch(`${API_ENDPOINT}/fenxi`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -123,41 +316,50 @@
             },
             body: JSON.stringify({ imageUrls: uploadedUrls })
           });
-          const result = await response.json();
           
-          if (result.error) throw new Error(result.error);
-          document.getElementById('result').innerHTML = result.result.replace(/<br>/g, '\n');
-          document.getElementById('msg').innerText = '分析完成';
-
-          // 添加PDF下载链接
-          if (result.pdfUrl) {
-            const downloadLink = `<a href="${result.pdfUrl}" download style="color: blue;">下载PDF试卷</a>`;
-            document.getElementById('result').innerHTML += '\n\n' + downloadLink;
-          }
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          
+          document.getElementById('result').innerHTML = 
+            data.result.replace(/<br>/g, '\n') + 
+            (data.pdfUrl ? `\n\n<a href="${data.pdfUrl}" download>📥 下载PDF试卷</a>` : '');
+          
+          showMessage('🎉 分析完成');
         } catch (e) {
-          document.getElementById('msg').innerText = '分析失败: ' + e.message;
+          showMessage(`❌ 错误: ${e.message}`, 'error');
+        } finally {
+          btn.innerHTML = '🔍 开始分析';
+          btn.disabled = false;
         }
       };
 
-      // --- 历史记录逻辑 ---
-      document.getElementById('historyBtn').onclick = async function () {
-        document.getElementById('history').innerHTML = '加载中...';
+      // 历史记录
+      document.getElementById('historyBtn').onclick = async function() {
+        const container = document.getElementById('history');
+        container.innerHTML = '<div class="loading"></div>';
+        
         try {
-          const response = await fetch(`${API_ENDPOINT}/history?userId=${userId}`);
-          const { data } = await response.json();
+          const res = await fetch(`${API_ENDPOINT}/history?userId=${userId}`);
+          const { data } = await res.json();
           
-          const html = data.map(item => `
-            <div class="history-item">
-              <div>时间：${new Date(item.time).toLocaleString()}</div>
-              <a href="${item.pdfUrl}" download>下载试卷</a>
-            </div>
-          `).join('');
-          
-          document.getElementById('history').innerHTML = html || '无24小时内记录';
+          container.innerHTML = data.length 
+            ? data.map(item => `
+                <div class="history-item">
+                  <div>📅 ${new Date(item.time).toLocaleString()}</div>
+                  <a href="${item.pdfUrl}" download>📄 下载试卷</a>
+                </div>
+              `).join('') 
+            : '📭 暂无历史记录';
         } catch (e) {
-          document.getElementById('history').innerHTML = '加载失败';
+          container.innerHTML = '⚠️ 加载失败';
         }
       };
+
+      function showMessage(text, type = 'info') {
+        const msg = document.getElementById('msg');
+        msg.innerHTML = text;
+        msg.style.color = type === 'error' ? '#ff3b30' : type === 'warning' ? '#ff9500' : '#34c759';
+      }
     })();
   </script>
 </body>
