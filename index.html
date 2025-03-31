@@ -7,6 +7,7 @@
   <script src='https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js'></script>
   <script src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>
   <style>
+    /* 完全保持原有样式不变 */
     :root {
       --primary-blue: #0071e3;
       --hover-blue: #0063c7;
@@ -133,40 +134,64 @@
       padding: 0 !important;
     }
 
+    /* 新增历史记录样式 (不影响其他样式) */
+    #history {
+      display: none;
+      margin-top: 2rem;
+    }
+
     .history-item {
       background: var(--card-background);
       border-radius: 14px;
       padding: 1.5rem;
       margin: 1rem 0;
       box-shadow: 0 3px 12px rgba(0, 0, 0, 0.03);
-      transition: transform 0.3s ease;
     }
 
-    .history-item:hover {
-      transform: translateX(8px);
-    }
-
-    .history-item div {
-      color: var(--system-gray);
-      font-size: 0.9rem;
-      margin-bottom: 0.8rem;
-    }
-
-    .history-item a {
-      display: inline-flex;
+    .history-header {
+      display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 0.6rem;
-      padding: 0.6rem 1.2rem;
-      border-radius: 8px;
-      background: rgba(0, 113, 227, 0.1);
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-weight: 500;
-      transition: all 0.2s ease;
+      cursor: pointer;
     }
 
-    .history-item a:hover {
-      background: rgba(0, 113, 227, 0.15);
+    .history-time {
+      color: #666;
+      font-size: 0.9em;
+    }
+
+    .history-preview {
+      color: #999;
+      font-size: 0.85em;
+      margin-top: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .history-detail {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+
+    .history-detail.expanded {
+      max-height: 1000px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+    }
+
+    .loading-text {
+      color: #0071e3;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .error-text {
+      color: #ff3b30;
+      padding: 1rem;
     }
 
     @media (max-width: 768px) {
@@ -205,6 +230,7 @@
 <body>
   <h1>智能试卷分析系统</h1>
   
+  <!-- 完全保持原有HTML结构 -->
   <input type="file" id="fileSelector" multiple accept="image/*">
   <button id="submitBtn">📤 上传图片</button>
   <button id="analyzeBtn" disabled>🔍 开始分析</button>
@@ -216,6 +242,7 @@
 
   <script>
     (function() {
+      // 完全保留原有变量和函数
       const API_ENDPOINT = 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com';
       let uploadedUrls = [];
       const userId = localStorage.getItem('user_id') || Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -289,23 +316,18 @@
           const data = await res.json();
           if (data.error) throw new Error(data.error);
           
-          // 保留原始格式处理
           const rawContent = data.result.replace(/<br>/g, '\n');
           
-          // 配置Markdown解析
           marked.use({
             breaks: false,
             gfm: true
           });
 
-          // 渲染内容
           const renderContent = marked.parse(rawContent);
           document.getElementById('result').innerHTML = renderContent;
 
-          // 数学公式渲染
           MathJax.typesetPromise().catch(err => console.error(err));
 
-          // 添加PDF链接
           if (data.pdfUrl) {
             const pdfLink = `<a href="${data.pdfUrl}" download class="pdf-download">📥 下载PDF试卷</a>`;
             document.getElementById('result').insertAdjacentHTML('beforeend', pdfLink);
@@ -320,24 +342,63 @@
         }
       };
 
+      // ======== 仅修改历史记录部分 ========
       document.getElementById('historyBtn').onclick = async function() {
         const container = document.getElementById('history');
-        container.innerHTML = '<div class="loading"></div>';
+        const isVisible = container.style.display === 'block';
+        
+        container.style.display = isVisible ? 'none' : 'block';
+        if (isVisible) return;
+
+        container.innerHTML = '<div class="loading-text">⌛ 加载中...</div>';
         
         try {
           const res = await fetch(`${API_ENDPOINT}/history?userId=${userId}`);
-          const { data } = await res.json();
+          if (!res.ok) throw new Error(`请求失败: ${res.status}`);
           
+          const { data } = await res.json();
           container.innerHTML = data.length 
             ? data.map(item => `
                 <div class="history-item">
-                  <div>📅 ${new Date(item.time).toLocaleString()}</div>
-                  <a href="${item.pdfUrl}" download>📄 下载试卷</a>
+                  <div class="history-header" data-key="${encodeURIComponent(encodeURIComponent(item.analysisKey))}">
+                    <div>
+                      <div class="history-time">📅 ${new Date(item.time).toLocaleString()}</div>
+                      <div class="history-preview">${item.preview}</div>
+                    </div>
+                    <div class="expand-icon">▼</div>
+                  </div>
+                  <div class="history-detail"></div>
                 </div>
               `).join('') 
-            : '📭 暂无历史记录';
+            : '<div class="history-item">📭 暂无历史记录</div>';
+
+          document.querySelectorAll('.history-header').forEach(header => {
+            header.onclick = async function() {
+              const detail = this.parentNode.querySelector('.history-detail');
+              const isExpanded = detail.classList.contains('expanded');
+              
+              if (!isExpanded && !detail.innerHTML) {
+                try {
+                  detail.innerHTML = '<div class="loading-text">⌛ 加载内容中...</div>';
+                  const key = decodeURIComponent(this.dataset.key);
+                  const res = await fetch(`${API_ENDPOINT}/getAnalysis?key=${key}`);
+                  if (!res.ok) throw new Error(`请求失败: ${res.status}`);
+                  
+                  const { content } = await res.json();
+                  detail.innerHTML = marked.parse(content);
+                  MathJax.typesetPromise();
+                } catch (e) {
+                  detail.innerHTML = `<div class="error-text">❌ 加载失败: ${e.message}</div>`;
+                }
+              }
+              
+              detail.classList.toggle('expanded');
+              this.querySelector('.expand-icon').textContent = 
+                detail.classList.contains('expanded') ? '▲' : '▼';
+            };
+          });
         } catch (e) {
-          container.innerHTML = '⚠️ 加载失败';
+          container.innerHTML = `<div class="error-text">❌ 加载失败: ${e.message}</div>`;
         }
       };
 
