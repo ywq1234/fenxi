@@ -26,7 +26,6 @@
   };
   </script>
   <script src="https://cdn.staticfile.org/mathjax/3.2.2/es5/tex-chtml.js"></script>
-
   <style>
     :root {
       --primary-blue: #0071e3;
@@ -35,7 +34,6 @@
       --background: #f5f5f7;
       --card-background: #ffffff;
     }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell;
       background: var(--background);
@@ -46,7 +44,6 @@
       padding: 2rem;
       min-height: 100vh;
     }
-
     h1 {
       font-size: 2.2rem;
       font-weight: 700;
@@ -56,7 +53,6 @@
       color: #1d1d1f;
       position: relative;
     }
-
     h1::after {
       content: "";
       display: block;
@@ -66,7 +62,6 @@
       margin: 1.5rem auto 0;
       border-radius: 2px;
     }
-
     #fileSelector {
       width: 100%;
       padding: 1.2rem;
@@ -77,12 +72,10 @@
       transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
       font-size: 1rem;
     }
-
     #fileSelector:hover {
       border-color: var(--primary-blue);
       background: rgba(0, 113, 227, 0.02);
     }
-
     button {
       width: 100%;
       padding: 1.2rem;
@@ -100,25 +93,21 @@
       gap: 0.8rem;
       box-shadow: 0 4px 16px rgba(0, 113, 227, 0.15);
     }
-
     button:disabled {
       background: linear-gradient(145deg, #e5e5ea, #d1d1d6);
       color: #86868b;
       box-shadow: none;
       cursor: not-allowed;
     }
-
     button:not(:disabled):hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 24px rgba(0, 113, 227, 0.25);
       filter: brightness(1.05);
     }
-
     button:active {
       transform: translateY(1px);
       filter: brightness(0.98);
     }
-
     #msg {
       padding: 1rem;
       margin: 1.5rem 0;
@@ -128,7 +117,6 @@
       color: var(--system-gray);
       font-size: 0.95rem;
     }
-
     #result {
       background: var(--card-background);
       border-radius: 18px;
@@ -138,27 +126,22 @@
       line-height: 1.4;
       font-family: inherit;
     }
-
     #result p {
       margin: 0.3em 0;
     }
-
     #result ul, #result ol {
       margin: 0.2em 0;
       padding-left: 1.2em;
     }
-
     .MathJax_CHTML {
       display: inline !important;
       margin: 0 0.1em !important;
       padding: 0 !important;
     }
-
     #history {
       display: none;
       margin-top: 2rem;
     }
-
     .history-item {
       background: var(--card-background);
       border-radius: 14px;
@@ -166,19 +149,16 @@
       margin: 1rem 0;
       box-shadow: 0 3px 12px rgba(0, 0, 0, 0.03);
     }
-
     .history-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       cursor: pointer;
     }
-
     .history-time {
       color: #666;
       font-size: 0.9em;
     }
-
     .history-preview {
       color: #999;
       font-size: 0.85em;
@@ -189,57 +169,46 @@
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
     }
-
     .history-detail {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease-out;
-    }
-
-    .history-detail.expanded {
-      max-height: 1000px;
+      display: none;
       padding-top: 15px;
       border-top: 1px solid #eee;
+      margin-top: 15px;
     }
-
+    .history-detail.expanded {
+      display: block !important;
+    }
     .loading-text {
       color: #0071e3;
       padding: 1rem;
       text-align: center;
     }
-
     .error-text {
       color: #ff3b30;
       padding: 1rem;
     }
-
     @media (max-width: 768px) {
       body {
         padding: 1.5rem;
         font-size: 1rem;
       }
-
       h1 {
         font-size: 1.8rem;
         margin: 2rem 0;
       }
-
       #fileSelector {
         padding: 1rem;
         border-radius: 14px;
       }
-
       button {
         padding: 1.1rem;
         font-size: 1rem;
         border-radius: 12px;
       }
-
       #result {
         padding: 1.5rem;
         border-radius: 16px;
       }
-
       .history-item {
         padding: 1.2rem;
       }
@@ -257,27 +226,23 @@
   <div id="msg"></div>
   <div id="result"></div>
   <div id="history"></div>
-
   <script>
     (function() {
       const API_ENDPOINT = 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com';
       let uploadedUrls = [];
       const userId = localStorage.getItem('user_id') || Date.now().toString(36) + Math.random().toString(36).substr(2);
       localStorage.setItem('user_id', userId);
-
       // 上传功能
       const camSafeUrlEncode = str => encodeURIComponent(str)
         .replace(/!/g, '%21').replace(/'/g, '%27')
         .replace(/\(/g, '%28').replace(/\)/g, '%29')
         .replace(/\*/g, '%2A');
-
       const getAuthorization = (opt, callback) => {
         fetch(`${API_ENDPOINT}/shangchuan?ext=${opt.ext}`)
           .then(res => res.json())
           .then(data => callback(null, data.data))
           .catch(err => callback('获取凭证失败'));
       };
-
       const uploadFile = (file, callback) => {
         const ext = file.name.split('.').pop() || '';
         getAuthorization({ ext }, (err, credentials) => {
@@ -297,12 +262,10 @@
           xhr.send(file);
         });
       };
-
       // 上传按钮事件
       document.getElementById('submitBtn').onclick = async function() {
         const files = [...document.getElementById('fileSelector').files];
         if (!files.length) return showMessage('请选择图片文件', 'warning');
-
         showMessage('📡 上传中...');
         uploadedUrls = [];
         
@@ -316,7 +279,6 @@
         document.getElementById('analyzeBtn').disabled = false;
         showMessage(`✅ 成功上传 ${uploadedUrls.length} 张图片`);
       };
-
       // 分析功能
       document.getElementById('analyzeBtn').onclick = async function() {
         const btn = this;
@@ -327,7 +289,6 @@
           // 请求超时处理（30秒）
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 120000);
-
           const res = await fetch(`${API_ENDPOINT}/fenxi`, {
             method: 'POST',
             headers: {
@@ -338,20 +299,17 @@
             signal: controller.signal
           });
           clearTimeout(timeoutId);
-
           const data = await res.json();
           if (data.error) throw new Error(data.error);
           
           const rawContent = data.result.replace(/<br>/g, '\n');
           
           marked.use({
-            breaks: false,
+            breaks: true,
             gfm: true
           });
-
           const renderContent = marked.parse(rawContent);
           document.getElementById('result').innerHTML = renderContent;
-
           // 数学公式渲染
           MathJax.typesetClear();
           await MathJax.typesetPromise([document.getElementById('result')]);
@@ -359,7 +317,6 @@
             node.style.fontSize = 'inherit';
             node.style.display = 'inline-block';
           });
-
           if (data.pdfUrl) {
             const pdfLink = `<a href="${data.pdfUrl}" download class="pdf-download">📥 下载PDF试卷</a>`;
             document.getElementById('result').insertAdjacentHTML('beforeend', pdfLink);
@@ -373,7 +330,6 @@
           btn.disabled = false;
         }
       };
-
       // 历史记录功能
       document.getElementById('historyBtn').onclick = async function() {
         const container = document.getElementById('history');
@@ -381,7 +337,6 @@
         
         container.style.display = isVisible ? 'none' : 'block';
         if (isVisible) return;
-
         container.innerHTML = '<div class="loading-text">⌛ 加载中...</div>';
         
         try {
@@ -403,7 +358,6 @@
                 </div>
               `).join('') 
             : '<div class="history-item">📭 暂无历史记录</div>';
-
           document.querySelectorAll('.history-header').forEach(header => {
             header.onclick = async function() {
               const detail = this.parentNode.querySelector('.history-detail');
@@ -413,13 +367,21 @@
                 try {
                   detail.innerHTML = '<div class="loading-text">⌛ 加载内容中...</div>';
                   const key = decodeURIComponent(this.dataset.key);
-                  const res = await fetch(`${API_ENDPOINT}/getAnalysis?key=${key}`);
+                  const cosUrl = `https://shijuanshibie-1343742632.cos.ap-beijing.myqcloud.com/${key}`;
+                  const res = await fetch(cosUrl);
                   if (!res.ok) throw new Error(`请求失败: ${res.status}`);
                   
-                  const { content } = await res.json();
-                  detail.innerHTML = marked.parse(content);
-
-                  // 历史记录公式渲染
+                  const rawContent = await res.text();
+                  // 清理#符号
+                  const cleanedContent = rawContent.replace(/^###+/g, '').trim();
+                  marked.use({
+                    breaks: true,
+                    gfm: true
+                  });
+                  const renderContent = marked.parse(cleanedContent);
+                  // 调整标题样式
+                  const styledContent = renderContent.replace(/<h3>/g, '<h3 style="color: var(--primary-blue); margin-bottom: 0.8rem;">');
+                  detail.innerHTML = styledContent;
                   MathJax.typesetClear();
                   await MathJax.typesetPromise([detail]);
                 } catch (e) {
@@ -430,13 +392,13 @@
               detail.classList.toggle('expanded');
               this.querySelector('.expand-icon').textContent = 
                 detail.classList.contains('expanded') ? '▲' : '▼';
+              detail.style.display = detail.classList.contains('expanded') ? 'block' : 'none';
             };
           });
         } catch (e) {
           container.innerHTML = `<div class="error-text">❌ 加载失败: ${e.message}</div>`;
         }
       };
-
       // 消息显示函数
       function showMessage(text, type = 'info') {
         const msg = document.getElementById('msg');
