@@ -5,9 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>智能试卷分析系统</title>
   <script src='https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js'></script>
-  <script src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>
+  
+  <!-- MathJax配置 -->
+  <script>
+  MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      packages: {'[+]': ['autoload']}
+    },
+    startup: {
+      typeset: false,
+      ready: () => MathJax.startup.defaultReady()
+    },
+    chtml: {
+      fontURL: 'https://cdn.staticfile.org/mathjax/3.2.2/es5/output/chtml/fonts/woff-v2'
+    },
+    options: {
+      enableMenu: false
+    }
+  };
+  </script>
+  <script src="https://cdn.staticfile.org/mathjax/3.2.2/es5/tex-chtml.js"></script>
+
   <style>
-    /* 完全保持原有样式不变 */
     :root {
       --primary-blue: #0071e3;
       --hover-blue: #0063c7;
@@ -134,7 +154,6 @@
       padding: 0 !important;
     }
 
-    /* 新增历史记录样式 (不影响其他样式) */
     #history {
       display: none;
       margin-top: 2rem;
@@ -230,7 +249,6 @@
 <body>
   <h1>智能试卷分析系统</h1>
   
-  <!-- 完全保持原有HTML结构 -->
   <input type="file" id="fileSelector" multiple accept="image/*">
   <button id="submitBtn">📤 上传图片</button>
   <button id="analyzeBtn" disabled>🔍 开始分析</button>
@@ -242,12 +260,12 @@
 
   <script>
     (function() {
-      // 完全保留原有变量和函数
       const API_ENDPOINT = 'https://analyze-4gbej3877844ea2d-1343742632.ap-shanghai.app.tcloudbase.com';
       let uploadedUrls = [];
       const userId = localStorage.getItem('user_id') || Date.now().toString(36) + Math.random().toString(36).substr(2);
       localStorage.setItem('user_id', userId);
 
+      // 上传功能
       const camSafeUrlEncode = str => encodeURIComponent(str)
         .replace(/!/g, '%21').replace(/'/g, '%27')
         .replace(/\(/g, '%28').replace(/\)/g, '%29')
@@ -280,6 +298,7 @@
         });
       };
 
+      // 上传按钮事件
       document.getElementById('submitBtn').onclick = async function() {
         const files = [...document.getElementById('fileSelector').files];
         if (!files.length) return showMessage('请选择图片文件', 'warning');
@@ -298,21 +317,28 @@
         showMessage(`✅ 成功上传 ${uploadedUrls.length} 张图片`);
       };
 
+      // 分析功能
       document.getElementById('analyzeBtn').onclick = async function() {
         const btn = this;
         btn.innerHTML = '<div class="loading"></div> 分析中...';
         btn.disabled = true;
         
         try {
+          // 请求超时处理（30秒）
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 120000);
+
           const res = await fetch(`${API_ENDPOINT}/fenxi`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'X-User-Id': userId
             },
-            body: JSON.stringify({ imageUrls: uploadedUrls })
+            body: JSON.stringify({ imageUrls: uploadedUrls }),
+            signal: controller.signal
           });
-          
+          clearTimeout(timeoutId);
+
           const data = await res.json();
           if (data.error) throw new Error(data.error);
           
@@ -326,7 +352,13 @@
           const renderContent = marked.parse(rawContent);
           document.getElementById('result').innerHTML = renderContent;
 
-          MathJax.typesetPromise().catch(err => console.error(err));
+          // 数学公式渲染
+          MathJax.typesetClear();
+          await MathJax.typesetPromise([document.getElementById('result')]);
+          document.querySelectorAll('.MJX-CHTML').forEach(node => {
+            node.style.fontSize = 'inherit';
+            node.style.display = 'inline-block';
+          });
 
           if (data.pdfUrl) {
             const pdfLink = `<a href="${data.pdfUrl}" download class="pdf-download">📥 下载PDF试卷</a>`;
@@ -335,14 +367,14 @@
           
           showMessage('🎉 分析完成');
         } catch (e) {
-          showMessage(`❌ 错误: ${e.message}`, 'error');
+          showMessage(e.name === 'AbortError' ? '❌ 请求超时' : `❌ 错误: ${e.message}`, 'error');
         } finally {
           btn.innerHTML = '🔍 开始分析';
           btn.disabled = false;
         }
       };
 
-      // ======== 仅修改历史记录部分 ========
+      // 历史记录功能
       document.getElementById('historyBtn').onclick = async function() {
         const container = document.getElementById('history');
         const isVisible = container.style.display === 'block';
@@ -360,7 +392,7 @@
           container.innerHTML = data.length 
             ? data.map(item => `
                 <div class="history-item">
-                  <div class="history-header" data-key="${encodeURIComponent(encodeURIComponent(item.analysisKey))}">
+                  <div class="history-header" data-key="${encodeURIComponent(item.analysisKey)}">
                     <div>
                       <div class="history-time">📅 ${new Date(item.time).toLocaleString()}</div>
                       <div class="history-preview">${item.preview}</div>
@@ -386,7 +418,10 @@
                   
                   const { content } = await res.json();
                   detail.innerHTML = marked.parse(content);
-                  MathJax.typesetPromise();
+
+                  // 历史记录公式渲染
+                  MathJax.typesetClear();
+                  await MathJax.typesetPromise([detail]);
                 } catch (e) {
                   detail.innerHTML = `<div class="error-text">❌ 加载失败: ${e.message}</div>`;
                 }
@@ -402,6 +437,7 @@
         }
       };
 
+      // 消息显示函数
       function showMessage(text, type = 'info') {
         const msg = document.getElementById('msg');
         msg.innerHTML = text;
