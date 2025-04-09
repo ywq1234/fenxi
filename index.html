@@ -232,17 +232,20 @@
       let uploadedUrls = [];
       const userId = localStorage.getItem('user_id') || Date.now().toString(36) + Math.random().toString(36).substr(2);
       localStorage.setItem('user_id', userId);
+      
       // 上传功能
       const camSafeUrlEncode = str => encodeURIComponent(str)
         .replace(/!/g, '%21').replace(/'/g, '%27')
         .replace(/\(/g, '%28').replace(/\)/g, '%29')
         .replace(/\*/g, '%2A');
+      
       const getAuthorization = (opt, callback) => {
         fetch(`${API_ENDPOINT}/shangchuan?ext=${opt.ext}`)
           .then(res => res.json())
           .then(data => callback(null, data.data))
           .catch(err => callback('获取凭证失败'));
       };
+      
       const uploadFile = (file, callback) => {
         const ext = file.name.split('.').pop() || '';
         getAuthorization({ ext }, (err, credentials) => {
@@ -262,6 +265,7 @@
           xhr.send(file);
         });
       };
+      
       // 上传按钮事件
       document.getElementById('submitBtn').onclick = async function() {
         const files = [...document.getElementById('fileSelector').files];
@@ -279,14 +283,19 @@
         document.getElementById('analyzeBtn').disabled = false;
         showMessage(`✅ 成功上传 ${uploadedUrls.length} 张图片`);
       };
+      
       // 分析功能
       document.getElementById('analyzeBtn').onclick = async function() {
+        if (!uploadedUrls.length) {
+          showMessage('请先上传图片', 'error');
+          return;
+        };
+        
         const btn = this;
         btn.innerHTML = '<div class="loading"></div> 分析中...';
         btn.disabled = true;
         
         try {
-          // 请求超时处理（30秒）
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 120000);
           const res = await fetch(`${API_ENDPOINT}/fenxi`, {
@@ -310,13 +319,14 @@
           });
           const renderContent = marked.parse(rawContent);
           document.getElementById('result').innerHTML = renderContent;
-          // 数学公式渲染
+          
           MathJax.typesetClear();
           await MathJax.typesetPromise([document.getElementById('result')]);
           document.querySelectorAll('.MJX-CHTML').forEach(node => {
             node.style.fontSize = 'inherit';
             node.style.display = 'inline-block';
           });
+          
           if (data.pdfUrl) {
             const pdfLink = `<a href="${data.pdfUrl}" download class="pdf-download">📥 下载PDF试卷</a>`;
             document.getElementById('result').insertAdjacentHTML('beforeend', pdfLink);
@@ -330,6 +340,7 @@
           btn.disabled = false;
         }
       };
+      
       // 历史记录功能
       document.getElementById('historyBtn').onclick = async function() {
         const container = document.getElementById('history');
@@ -354,10 +365,17 @@
                     </div>
                     <div class="expand-icon">▼</div>
                   </div>
+                  <!-- 新增PDF下载按钮 -->
+                  <div class="history-actions" style="margin: 1rem 0; text-align: right;">
+                    <a href="${item.pdfUrl}" download class="pdf-download" style="color: var(--primary-blue); text-decoration: underline; margin-left: 10px;">
+                      📥 下载PDF试卷
+                    </a>
+                  </div>
                   <div class="history-detail"></div>
                 </div>
               `).join('') 
             : '<div class="history-item">📭 暂无历史记录</div>';
+          
           document.querySelectorAll('.history-header').forEach(header => {
             header.onclick = async function() {
               const detail = this.parentNode.querySelector('.history-detail');
@@ -372,14 +390,12 @@
                   if (!res.ok) throw new Error(`请求失败: ${res.status}`);
                   
                   const rawContent = await res.text();
-                  // 清理#符号
                   const cleanedContent = rawContent.replace(/^###+/g, '').trim();
                   marked.use({
                     breaks: true,
                     gfm: true
                   });
                   const renderContent = marked.parse(cleanedContent);
-                  // 调整标题样式
                   const styledContent = renderContent.replace(/<h3>/g, '<h3 style="color: var(--primary-blue); margin-bottom: 0.8rem;">');
                   detail.innerHTML = styledContent;
                   MathJax.typesetClear();
@@ -399,6 +415,7 @@
           container.innerHTML = `<div class="error-text">❌ 加载失败: ${e.message}</div>`;
         }
       };
+      
       // 消息显示函数
       function showMessage(text, type = 'info') {
         const msg = document.getElementById('msg');
